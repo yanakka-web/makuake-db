@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Makuake 終了プロジェクト データベース</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: sans-serif; background: #f5f5f5; }
+header { background: #1a1a2e; color: white; padding: 10px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; }
+header h1 { font-size: 15px; }
+.header-stats { margin-left: auto; display: flex; gap: 20px; font-size: 12px; color: #aaa; }
+.header-stats b { color: white; }
+.container { display: flex; min-height: calc(100vh - 48px); }
+.sidebar { width: 215px; background: white; padding: 14px; border-right: 1px solid #eee; flex-shrink: 0; overflow-y: auto; height: calc(100vh - 48px); position: sticky; top: 48px; }
+.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.sidebar-header h2 { font-size: 13px; color: #333; font-weight: bold; }
+.btn-reset { padding: 3px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 11px; }
+.filter-group { margin-bottom: 13px; }
+.filter-label { font-size: 11px; color: #666; display: block; margin-bottom: 4px; }
+.filter-group input { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+.range-row { display: flex; gap: 4px; align-items: center; }
+.range-row input { width: 68px; padding: 6px 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; }
+.range-row span { font-size: 11px; color: #999; flex-shrink: 0; }
+.favorite-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #333; cursor: pointer; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.tag { padding: 2px 8px; background: #f0f0f0; border-radius: 12px; font-size: 11px; cursor: pointer; border: 1px solid transparent; color: #555; }
+.tag:hover { background: #ffe0ee; color: #e83e8c; }
+.year-btns { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 5px; }
+.year-btn { padding: 2px 5px; font-size: 10px; border: 1px solid #ddd; border-radius: 3px; cursor: pointer; background: white; }
+.year-btn:hover { background: #ffe0ee; color: #e83e8c; border-color: #e83e8c; }
+.main { flex: 1; padding: 14px; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.toolbar-left { font-size: 12px; color: #555; }
+.toolbar-right { display: flex; gap: 8px; align-items: center; }
+.toolbar-right select { padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+.btn-csv { padding: 5px 12px; background: #1a1a2e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.15s, box-shadow 0.15s; position: relative; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.card-img { width: 100%; height: 145px; object-fit: cover; display: block; background: #eee; }
+.card-no-img { width: 100%; height: 145px; background: #eee; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 12px; }
+.card-fav { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; }
+.card-body { padding: 10px; }
+.card-category { font-size: 10px; color: #e83e8c; font-weight: bold; margin-bottom: 3px; }
+.card-title { font-size: 11px; font-weight: bold; margin-bottom: 8px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #222; min-height: 33px; }
+.card-amount { font-size: 17px; font-weight: bold; color: #e83e8c; }
+.card-amount-label { font-size: 10px; color: #999; margin-bottom: 6px; }
+.card-meta { display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-bottom: 4px; }
+.card-rate { color: #e83e8c; font-weight: bold; }
+.card-enddate { font-size: 10px; color: #999; margin-bottom: 6px; }
+.card-link { display: block; text-align: right; font-size: 10px; color: #e83e8c; text-decoration: none; }
+.pagination { display: flex; justify-content: center; gap: 6px; margin-top: 20px; flex-wrap: wrap; }
+.pagination button { padding: 5px 10px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.pagination button.active { background: #e83e8c; color: white; border-color: #e83e8c; }
+.pagination button:hover:not(.active) { background: #f5f5f5; }
+</style>
+</head>
+<body>
+<header>
+  <div style="background:#e83e8c;width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;flex-shrink:0;">M</div>
+  <h1>Makuake 終了プロジェクト データベース</h1>
+  <div class="header-stats">
+    <span>総プロジェクト: <b id="statTotal">-</b></span>
+    <span>総額: <b id="statAmount">-</b></span>
+    <span>最高達成率: <b id="statRate">-</b></span>
+  </div>
+</header>
+<div class="container">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>絞り込み</h2>
+      <button class="btn-reset" onclick="resetFilters()">× リセット</button>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">タイトル検索</label>
+      <input type="text" id="searchTitle" placeholder="タイトルで検索...">
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">応援購入総額（円）</label>
+      <div class="range-row">
+        <input type="number" id="minAmount" placeholder="最小">
+        <span>〜</span>
+        <input type="number" id="maxAmount" placeholder="最大">
+      </div>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">達成率（%）</label>
+      <div class="range-row">
+        <input type="number" id="minRate" placeholder="最小">
+        <span>〜</span>
+        <input type="number" id="maxRate" placeholder="最大">
+      </div>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">サポーター数</label>
+      <div class="range-row">
+        <input type="number" id="minSupporters" placeholder="最小">
+        <span>〜</span>
+        <input type="number" id="maxSupporters" placeholder="最大">
+      </div>
+    </div>
+    <div class="filter-group">
+      <label class="favorite-check">
+        <input type="checkbox" id="favOnly"> お気に入りのみ表示
+      </label>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">終了日</label>
+      <div class="range-row">
+        <input type="date" id="endDateFrom" style="width:90px;font-size:10px;">
+        <span>〜</span>
+        <input type="date" id="endDateTo" style="width:90px;font-size:10px;">
+      </div>
+      <div class="year-btns">
+        <button class="year-btn" onclick="setYear(2018)">2018</button>
+        <button class="year-btn" onclick="setYear(2019)">2019</button>
+        <button class="year-btn" onclick="setYear(2020)">2020</button>
+        <button class="year-btn" onclick="setYear(2021)">2021</button>
+        <button class="year-btn" onclick="setYear(2022)">2022</button>
+        <button class="year-btn" onclick="setYear(2023)">2023</button>
+        <button class="year-btn" onclick="setYear(2024)">2024</button>
+        <button class="year-btn" onclick="setYear(2025)">2025</button>
+        <button class="year-btn" onclick="setYear(2026)">2026</button>
+        <button class="year-btn" onclick="setYear(2027)">2027</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">タグ</label>
+      <div class="tag-list" id="tagList"></div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="toolbar">
+      <div class="toolbar-left" id="countLabel">読み込み中...</div>
+      <div class="toolbar-right">
+        <select id="sortSelect" onchange="loadProjects()">
+          <option value="amount_desc">金額が多い順</option>
+          <option value="amount_asc">金額が少ない順</option>
+          <option value="rate_desc">達成率が高い順</option>
+          <option value="supporters_desc">サポーター数が多い順</option>
+          <option value="newest">新しい順</option>
+          <option value="oldest">古い順</option>
+        </select>
+        <button class="btn-csv" onclick="downloadCSV()">CSV</button>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+<script>
+let currentPage = 1;
+let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+
+const TAGS = ['便利グッズ','プロダクト','ファッション','フード','アウトドア','テクノロジー','美容','健康','インテリア','旅行'];
+
+function initTags() {
+  const tagList = document.getElementById('tagList');
+  TAGS.forEach(tag => {
+    const el = document.createElement('span');
+    el.className = 'tag';
+    el.textContent = tag;
+    el.onclick = () => {
+      document.getElementById('searchTitle').value = tag;
+      currentPage = 1;
+      loadProjects();
+    };
+    tagList.appendChild(el);
+  });
+}
+
+function getFilters() {
+  return {
+    title: document.getElementById('searchTitle').value,
+    minAmount: document.getElementById('minAmount').value,
+    maxAmount: document.getElementById('maxAmount').value,
+    minRate: document.getElementById('minRate').value,
+    maxRate: document.getElementById('maxRate').value,
+    minSupporters: document.getElementById('minSupporters').value,
+    maxSupporters: document.getElementById('maxSupporters').value,
+    favOnly: document.getElementById('favOnly').checked,
+    endDateFrom: document.getElementById('endDateFrom').value,
+    endDateTo: document.getElementById('endDateTo').value,
+    sort: document.getElementById('sortSelect').value,
+  };
+}
+
+async function loadStats() {
+  const res = await fetch('/api/stats');
+  const data = await res.json();
+  document.getElementById('statTotal').textContent = data.total_projects.toLocaleString() + '件';
+  document.getElementById('statAmount').textContent = '¥' + Math.round(data.total_amount / 100000000) + '億';
+  document.getElementById('statRate').textContent = data.max_rate.toLocaleString() + '%';
+}
+
+async function loadProjects() {
+  const f = getFilters();
+  let url = `/api/projects?page=${currentPage}&limit=20`;
+  if (f.title) url += `&title=${encodeURIComponent(f.title)}`;
+  if (f.minAmount) url += `&min_amount=${f.minAmount}`;
+  if (f.maxAmount) url += `&max_amount=${f.maxAmount}`;
+  if (f.minRate) url += `&min_rate=${f.minRate}`;
+  if (f.maxRate) url += `&max_rate=${f.maxRate}`;
+  if (f.minSupporters) url += `&min_supporters=${f.minSupporters}`;
+  if (f.maxSupporters) url += `&max_supporters=${f.maxSupporters}`;
+  if (f.endDateFrom) url += `&end_date_from=${f.endDateFrom}`;
+  if (f.endDateTo) url += `&end_date_to=${f.endDateTo}`;
+  if (f.sort) url += `&sort=${f.sort}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+  let projects = data.projects;
+
+  if (f.favOnly) {
+    projects = projects.filter(p => favorites.includes(p.url));
+  }
+
+  const total = data.total;
+  const start = (currentPage - 1) * 20 + 1;
+  const end = Math.min(currentPage * 20, total);
+  document.getElementById('countLabel').textContent = `${total.toLocaleString()}件中 ${start}〜${end}件を表示`;
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  projects.forEach(p => {
+    const isFav = favorites.includes(p.url);
+    const card = document.createElement('div');
+    card.className = 'card';
+    const amount = p.amount ? '¥' + Math.round(p.amount / 10000).toLocaleString() + '万' : '-';
+    const endDate = p.end_date ? new Date(p.end_date * 1000).toLocaleDateString('ja-JP') : '-';
+    card.innerHTML = `
+      ${p.image_url ? `<img class="card-img" src="${p.image_url}" onerror="this.outerHTML='<div class=card-no-img>No Image</div>'">` : '<div class="card-no-img">No Image</div>'}
+      <button class="card-fav" onclick="toggleFav('${p.url}', this)">${isFav ? '★' : '☆'}</button>
+      <div class="card-body">
+        <div class="card-category">プロダクト</div>
+        <div class="card-title">${p.title || '(タイトルなし)'}</div>
+        <div class="card-amount">${amount}</div>
+        <div class="card-amount-label">応援購入総額</div>
+        <div class="card-meta">
+          <span>サポーター: ${p.supporters ? p.supporters.toLocaleString() + '人' : '-'}</span>
+          <span class="card-rate">${p.achievement_rate ? p.achievement_rate.toLocaleString() + '% 達成' : '-'}</span>
+        </div>
+        <div class="card-enddate">終了日: ${endDate}</div>
+        <a class="card-link" href="${p.url}" target="_blank">Makuakeで見る →</a>
+      </div>`;
+    grid.appendChild(card);
+  });
+  renderPagination(total);
+}
+
+function toggleFav(url, btn) {
+  if (favorites.includes(url)) {
+    favorites = favorites.filter(f => f !== url);
+    btn.textContent = '☆';
+  } else {
+    favorites.push(url);
+    btn.textContent = '★';
+  }
+  localStorage.setItem('favorites', JSON.stringify(favorites));
+}
+
+function setYear(year) {
+  document.getElementById('endDateFrom').value = `${year}-01-01`;
+  document.getElementById('endDateTo').value = `${year}-12-31`;
+  currentPage = 1;
+  loadProjects();
+}
+
+function renderPagination(total) {
+  const totalPages = Math.ceil(total / 20);
+  const pg = document.getElementById('pagination');
+  pg.innerHTML = '';
+  if (currentPage > 1) {
+    const btn = document.createElement('button');
+    btn.textContent = '←';
+    btn.onclick = () => { currentPage--; loadProjects(); scrollTo(0,0); };
+    pg.appendChild(btn);
+  }
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(totalPages, currentPage + 2);
+  for (let i = start; i <= end; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = i;
+    if (i === currentPage) btn.className = 'active';
+    btn.onclick = ((p) => () => { currentPage = p; loadProjects(); scrollTo(0,0); })(i);
+    pg.appendChild(btn);
+  }
+  if (currentPage < totalPages) {
+    const btn = document.createElement('button');
+    btn.textContent = '→';
+    btn.onclick = () => { currentPage++; loadProjects(); scrollTo(0,0); };
+    pg.appendChild(btn);
+  }
+}
+
+async function downloadCSV() {
+  const f = getFilters();
+  let url = `/api/projects?page=1&limit=1000`;
+  if (f.title) url += `&title=${encodeURIComponent(f.title)}`;
+  if (f.minAmount) url += `&min_amount=${f.minAmount}`;
+  if (f.maxAmount) url += `&max_amount=${f.maxAmount}`;
+  if (f.sort) url += `&sort=${f.sort}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  const rows = [['タイトル','金額','達成率','サポーター数','終了日','URL']];
+  data.projects.forEach(p => {
+    const endDate = p.end_date ? new Date(p.end_date * 1000).toLocaleDateString('ja-JP') : '';
+    rows.push([p.title, p.amount, p.achievement_rate, p.supporters, endDate, p.url]);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'makuake.csv';
+  a.click();
+}
+
+function resetFilters() {
+  ['searchTitle','minAmount','maxAmount','minRate','maxRate','minSupporters','maxSupporters','endDateFrom','endDateTo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('favOnly').checked = false;
+  currentPage = 1;
+  loadProjects();
+}
+
+let timer;
+['searchTitle','minAmount','maxAmount','minRate','maxRate','minSupporters','maxSupporters'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { currentPage = 1; loadProjects(); }, 500);
+  });
+});
+document.getElementById('favOnly').addEventListener('change', () => { currentPage = 1; loadProjects(); });
+
+initTags();
+loadStats();
+loadProjects();
+</script>
+</body>
+</html>
