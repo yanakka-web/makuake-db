@@ -294,26 +294,20 @@ function renderPagination(total) {
   }
 }
 
-async function downloadCSV() {
+function downloadCSV() {
   const f = getFilters();
-  let url = `/api/projects?page=1&limit=1000`;
+  let url = `/api/csv?sort=${encodeURIComponent(f.sort || 'amount_desc')}`;
   if (f.title) url += `&title=${encodeURIComponent(f.title)}`;
   if (f.minAmount) url += `&min_amount=${f.minAmount}`;
   if (f.maxAmount) url += `&max_amount=${f.maxAmount}`;
-  if (f.sort) url += `&sort=${f.sort}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  const rows = [['タイトル','金額','達成率','サポーター数','終了日','URL']];
-  data.projects.forEach(p => {
-    const endDate = p.end_date ? new Date(p.end_date * 1000).toLocaleDateString('ja-JP') : '';
-    rows.push([p.title, p.amount, p.achievement_rate, p.supporters, endDate, p.url]);
-  });
-  const csv = rows.map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'makuake.csv';
-  a.click();
+  if (f.minRate) url += `&min_rate=${f.minRate}`;
+  if (f.maxRate) url += `&max_rate=${f.maxRate}`;
+  if (f.minSupporters) url += `&min_supporters=${f.minSupporters}`;
+  if (f.maxSupporters) url += `&max_supporters=${f.maxSupporters}`;
+  if (f.endDateFrom) url += `&end_date_from=${f.endDateFrom}`;
+  if (f.endDateTo) url += `&end_date_to=${f.endDateTo}`;
+  // サーバー側で全件ストリーミング出力（上限なし）
+  window.location.href = url;
 }
 
 function resetFilters() {

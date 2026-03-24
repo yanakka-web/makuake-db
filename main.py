@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 import sqlite3
 import datetime
+import io
+import csv
 from typing import Optional
 
 app = FastAPI()
@@ -95,5 +98,99 @@ def get_stats():
         "max_rate": max_rate,
         "total_amount": total_amount
     }
+
+@app.get("/api/csv")
+def download_csv(
+    title: Optional[str] = None,
+    keyword: Optional[str] = None,
+    min_amount: Optional[int] = None,
+    max_amount: Optional[int] = None,
+    min_rate: Optional[int] = None,
+    max_rate: Optional[int] = None,
+    min_supporters: Optional[int] = None,
+    max_supporters: Optional[int] = None,
+    end_date_from: Optional[str] = None,
+    end_date_to: Optional[str] = None,
+    sort: Optional[str] = "amount_desc",
+):
+    conn = get_db()
+    c = conn.cursor()
+    query = "SELECT * FROM projects WHERE 1=1"
+    params = []
+    if title:
+        query += " AND title LIKE ?"
+        params.append(f"%{title}%")
+    if keyword:
+        query += " AND title LIKE ?"
+        params.append(f"%{keyword}%")
+    if min_amount:
+        query += " AND amount >= ?"
+        params.append(min_amount)
+    if max_amount:
+        query += " AND amount <= ?"
+        params.append(max_amount)
+    if min_rate:
+        query += " AND achievement_rate >= ?"
+        params.append(min_rate)
+    if max_rate:
+        query += " AND achievement_rate <= ?"
+        params.append(max_rate)
+    if min_supporters:
+        query += " AND supporters >= ?"
+        params.append(min_supporters)
+    if max_supporters:
+        query += " AND supporters <= ?"
+        params.append(max_supporters)
+    if end_date_from:
+        ts = int(datetime.datetime.strptime(end_date_from, "%Y-%m-%d").timestamp())
+        query += " AND end_date >= ?"
+        params.append(ts)
+    if end_date_to:
+        ts = int(datetime.datetime.strptime(end_date_to, "%Y-%m-%d").timestamp()) + 86400
+        query += " AND end_date <= ?"
+        params.append(ts)
+    sort_map = {
+        "amount_desc": "amount DESC",
+        "amount_asc": "amount ASC",
+        "rate_desc": "achievement_rate DESC",
+        "supporters_desc": "supporters DESC",
+        "newest": "id DESC",
+        "oldest": "id ASC",
+    }
+    query += f" ORDER BY {sort_map.get(sort, 'amount DESC')}"
+    projects = c.execute(query, params).fetchall()
+    conn.close()
+
+    def generate():
+        output = io.StringIO()
+        writer = csv.writer(output, quoting=csv.QUOTE_ALL)
+        writer.writerow(['タイトル', '金額', '達成率', 'サポーター数', '終了日', 'URL'])
+        yield '\ufeff' + output.getvalue()
+        for p in projects:
+            output = io.StringIO()
+            writer = csv.writer(output, quoting=csv.QUOTE_ALL)
+            pd = dict(p)
+            end_date = ''
+            if pd.get('end_date'):
+                try:
+                    end_date = datetime.datetime.fromtimestamp(int(pd['end_date'])).strftime('%Y/%m/%d')
+                except:
+                    end_date = str(pd['end_date'])
+            writer.writerow([
+                pd.get('title', ''),
+                pd.get('amount', ''),
+                pd.get('achievement_rate', ''),
+                pd.get('supporters', ''),
+                end_date,
+                pd.get('url', ''),
+            ])
+            yield output.getvalue()
+
+    filename = f"makuake_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        generate(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
